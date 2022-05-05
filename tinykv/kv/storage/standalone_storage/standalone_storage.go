@@ -15,6 +15,7 @@ type StandAloneStorage struct {
 }
 
 func NewStandAloneStorage(conf *config.Config) *StandAloneStorage {
+	//conf.DBPath = "D:" + conf.DBPath
 	db := engine_util.CreateDB("kv", conf)
 	return &StandAloneStorage{
 		db: db,
@@ -27,16 +28,40 @@ func (s *StandAloneStorage) Stop() error {
 
 func (s *StandAloneStorage) Reader(ctx *kvrpcpb.Context) (storage.StorageReader, error) {
 	// YOUR CODE HERE (lab1).
-	panic("not implemented yet")
-	return nil, nil
+	txn := s.db.NewTransaction(false)
+	read := NewBadgerReader(txn)
+	//txn := ctx.
+	return read, nil
+	//panic("not implemented yet")
+	//return nil, nil
 }
 
 func (s *StandAloneStorage) Write(ctx *kvrpcpb.Context, batch []storage.Modify) error {
 	// YOUR CODE HERE (lab1).
 	// Try to check the definition of `storage.Modify` and txn interface of `badger`.
 	// As the column family is not supported by `badger`, a wrapper is used to simulate it.
-	panic("not implemented yet")
-	return nil
+	//panic("not implemented yet")
+	if len(batch) == 1 {
+		data := batch[0]
+		switch data.Data.(type) {
+		case storage.Put:
+			err := engine_util.PutCF(s.db, data.Cf(), data.Key(), data.Value())
+			//if err != nil {
+			return err
+			//}
+		case storage.Delete:
+			err := engine_util.DeleteCF(s.db, data.Cf(), data.Key())
+			//if err != nil {
+			return err
+			//}
+		}
+	}
+	wBatch := new(engine_util.WriteBatch)
+	for _, modify := range batch {
+		wBatch.SetCF(modify.Cf(), modify.Key(), modify.Value())
+	}
+	err := wBatch.WriteToDB(s.db)
+	return err
 }
 
 type BadgerReader struct {
